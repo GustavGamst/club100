@@ -92,7 +92,7 @@ header {
 
 .layout {
     display: grid;
-    grid-template-columns: 1.2fr 1.8fr 1.2fr 1fr;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .panel {
