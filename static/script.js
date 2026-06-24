@@ -57,6 +57,29 @@ Sortable.create(document.getElementById("shoutout-bench"), {
     onEnd() { updateShoutListNumbers(); markDirty(); },
 });
 
+Sortable.create(document.getElementById("intro-drop"), {
+    group: { name: "shouts", pull: true, put: true },
+    animation: 180,
+    filter: SHOUT_DRAG_FILTER,
+    preventOnFilter: false,
+    ghostClass: "sortable-ghost",
+    chosenClass: "sortable-chosen",
+    onAdd(evt) {
+        // If a card was already there, send it to the bench
+        while (evt.to.children.length > 1) {
+            document.getElementById("shoutout-bench").appendChild(evt.to.children[0]);
+        }
+        updateIntroHint();
+        markDirty();
+    },
+    onRemove() { updateIntroHint(); markDirty(); },
+});
+
+function updateIntroHint() {
+    const filled = document.querySelector("#intro-drop .shoutout-card") !== null;
+    document.getElementById("intro-zone-hint").style.display = filled ? "none" : "";
+}
+
 // ── COUNTS + NUMBERING ────────────────────────────────────────────────────────
 
 function updateListNumbers() {
@@ -202,6 +225,7 @@ function saveOrder() {
     const bench = Array.from(document.querySelectorAll("#bench-section .song-card")).map(c => c.dataset.url);
     const shoutout_list  = Array.from(document.querySelectorAll("#shoutout-list .shoutout-card")).map(c => c.dataset.filename);
     const shoutout_bench = Array.from(document.querySelectorAll("#shoutout-bench .shoutout-card")).map(c => c.dataset.filename);
+    const intro_shoutout = document.querySelector("#intro-drop .shoutout-card")?.dataset.filename ?? null;
 
     const start_times = {};
     document.querySelectorAll(".song-card").forEach(card => {
@@ -214,7 +238,7 @@ function saveOrder() {
     fetch("/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ list, bench, shoutout_list, shoutout_bench, start_times }),
+        body: JSON.stringify({ list, bench, shoutout_list, shoutout_bench, start_times, intro_shoutout }),
     })
     .then(r => r.json())
     .then(data => {
@@ -887,9 +911,9 @@ function appendLog(text, cls) {
 
 // ── PREVIEW ───────────────────────────────────────────────────────────────────
 
-const PREVIEW_END_OFFSET = 48;   // seek to start_time + this (so last 12s of the 60s clip)
-const PREVIEW_END_WINDOW = 12;   // seconds to play at end of song
-const PREVIEW_START_WINDOW = 10; // seconds to play at start of next song
+const PREVIEW_END_OFFSET = 55;  // seek to start_time + this (so last 5s of the 60s clip)
+const PREVIEW_END_WINDOW = 5;   // seconds to play at end of song
+const PREVIEW_START_WINDOW = 5; // seconds to play at start of next song
 const FADE_OUT_DURATION = 4;     // seconds over which end fades out
 const FADE_IN_DURATION = 3;      // seconds over which start fades in
 
@@ -902,14 +926,34 @@ const pv = {
 };
 
 function buildTransitions() {
-    const songCards = Array.from(document.querySelectorAll("#list-section .song-card"));
+    const songCards  = Array.from(document.querySelectorAll("#list-section .song-card"));
     const shoutCards = Array.from(document.querySelectorAll("#shoutout-list .shoutout-card"));
-    if (songCards.length < 2) return [];
+    if (songCards.length < 1) return [];
 
-    return songCards.slice(0, -1).map((card, i) => {
-        const next = songCards[i + 1];
+    const transitions = [];
+
+    // Intro transition (intro shoutout → first song)
+    const introCard = document.querySelector("#intro-drop .shoutout-card");
+    if (introCard) {
+        const first = songCards[0];
+        transitions.push({
+            isIntro:   true,
+            shoutout:  {
+                filename: introCard.dataset.filename,
+                label:    introCard.querySelector(".shoutout-label").textContent,
+            },
+            nextTitle: first.querySelector(".song-title").textContent,
+            nextUrl:   first.dataset.url,
+            nextStart: parseFloat(first.querySelector(".start-time").value || 0),
+        });
+    }
+
+    // Regular between-song transitions
+    songCards.slice(0, -1).forEach((card, i) => {
+        const next  = songCards[i + 1];
         const shout = shoutCards[i] || null;
-        return {
+        transitions.push({
+            isIntro:   false,
             songTitle: card.querySelector(".song-title").textContent,
             songUrl:   card.dataset.url,
             songStart: parseFloat(card.querySelector(".start-time").value || 0),
@@ -920,14 +964,16 @@ function buildTransitions() {
             nextTitle: next.querySelector(".song-title").textContent,
             nextUrl:   next.dataset.url,
             nextStart: parseFloat(next.querySelector(".start-time").value || 0),
-        };
+        });
     });
+
+    return transitions;
 }
 
 function startPreview() {
     const transitions = buildTransitions();
     if (!transitions.length) {
-        alert("Add at least 2 songs to the Top 100 list to preview transitions.");
+        alert("Add at least 2 songs to the Top 100 list, or add an intro shoutout with at least 1 song.");
         return;
     }
 
@@ -998,15 +1044,17 @@ async function runTransition() {
     updatePreviewNav();
     renderTransitionInfo(t);
 
-    // 1 — Song ending
-    setPhase("song-end", "Song ending…");
-    await playSegment(
-        `/audio?link=${encodeURIComponent(t.songUrl)}`,
-        t.songStart + PREVIEW_END_OFFSET,
-        PREVIEW_END_WINDOW,
-        "fade-out"
-    );
-    if (!pv.active) return;
+    // 1 — Song ending (skipped for intro transition)
+    if (!t.isIntro) {
+        setPhase("song-end", "Song ending…");
+        await playSegment(
+            `/audio?link=${encodeURIComponent(t.songUrl)}`,
+            t.songStart + PREVIEW_END_OFFSET,
+            PREVIEW_END_WINDOW,
+            "fade-out"
+        );
+        if (!pv.active) return;
+    }
 
     // 2 — Shoutout (if any)
     if (t.shoutout) {
@@ -1114,7 +1162,14 @@ function setPhase(phase, label) {
 
 function renderTransitionInfo(t) {
     const shortTitle = str => str.length > 30 ? str.slice(0, 28) + "…" : str;
-    document.getElementById("pv-seg-end").textContent = shortTitle(t.songTitle);
+    const endEl = document.getElementById("pv-seg-end");
+    if (t.isIntro) {
+        endEl.textContent = "[ START ]";
+        endEl.classList.add("pv-no-shout");
+    } else {
+        endEl.textContent = shortTitle(t.songTitle);
+        endEl.classList.remove("pv-no-shout");
+    }
     const shoutEl = document.getElementById("pv-seg-shout");
     if (t.shoutout) {
         shoutEl.textContent = `[ ${t.shoutout.label} ]`;

@@ -68,7 +68,7 @@
 <main class="layout">
 
     {# ── SONG BENCH ─────────────────────────────────────────────────────── #}
-    <section class="panel">
+    <section class="panel panel-bench">
         <div class="panel-header">
             <span class="panel-title">BENCH</span>
             <span class="count-badge" id="bench-count">{{ bench_songs|length }}</span>
@@ -80,8 +80,19 @@
         </ul>
     </section>
 
+    {# ── INTRO SHOUTOUT ──────────────────────────────────────────────────── #}
+    <div class="intro-zone" id="intro-zone">
+        <span class="intro-zone-label">INTRO</span>
+        <ul class="intro-drop" id="intro-drop">
+            {% if intro_shoutout %}{{ shoutout_card(intro_shoutout) }}{% endif %}
+        </ul>
+        <span class="intro-zone-hint" id="intro-zone-hint"{% if intro_shoutout %} style="display:none"{% endif %}>
+            drop a shoutout here to play before the first song
+        </span>
+    </div>
+
     {# ── TOP 100 LIST ───────────────────────────────────────────────────── #}
-    <section class="panel">
+    <section class="panel panel-list">
         <div class="panel-header">
             <span class="panel-title">TOP 100</span>
             <span class="count-badge" id="list-count">{{ list_songs|length }}/100</span>
@@ -94,7 +105,7 @@
     </section>
 
     {# ── SHOUTOUTS LIST ─────────────────────────────────────────────────── #}
-    <section class="panel">
+    <section class="panel panel-shoutouts">
         <div class="panel-header">
             <span class="panel-title">SHOUTOUTS</span>
             <span class="count-badge" id="shout-list-count">{{ shoutout_list|length }}</span>
@@ -107,7 +118,7 @@
     </section>
 
     {# ── SHOUTOUT BENCH ─────────────────────────────────────────────────── #}
-    <section class="panel">
+    <section class="panel panel-shout-bench">
         <div class="panel-header">
             <span class="panel-title">SHOUT BENCH</span>
             <span class="count-badge" id="shout-bench-count">{{ shoutout_bench|length }}</span>

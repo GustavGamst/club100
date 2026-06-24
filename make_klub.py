@@ -1,5 +1,6 @@
 import os
 import shutil
+import subprocess
 import pandas as pd
 import time
 import argparse
@@ -182,7 +183,7 @@ def make_club(club_folder, club_file, n_songs = 100, output_name = "klub", shout
 def make_club_from_app(song_list, shoutout_list, build_dir="output",
                        output_name="klub100", file_format="mp3",
                        song_vol=-14, so_vol=-14, fade=3, song_length=60,
-                       log=print):
+                       intro_shoutout=None, log=print):
     """
     Build a Klub 100 directly from the app's in-memory state.
 
@@ -297,6 +298,29 @@ def make_club_from_app(song_list, shoutout_list, build_dir="output",
     )
 
     final = f"{output_base}.{file_format}"
+
+    if intro_shoutout:
+        intro_src = os.path.join("shoutouts", intro_shoutout["filename"])
+        if os.path.exists(intro_src):
+            log("Prepending intro shoutout…")
+            intro_prep = os.path.join(build_dir, "_intro_prep.wav")
+            subprocess.run([
+                "ffmpeg", "-y", "-i", intro_src,
+                "-af", f"loudnorm=I={so_vol}:TP=-1.5:LRA=11",
+                intro_prep,
+            ], capture_output=True)
+            if os.path.exists(intro_prep):
+                tmp = final + ".intro_tmp." + file_format
+                r = subprocess.run([
+                    "ffmpeg", "-y",
+                    "-i", intro_prep, "-i", final,
+                    "-filter_complex", "[0:0][1:0]concat=n=2:v=0:a=1[out]",
+                    "-map", "[out]", tmp,
+                ], capture_output=True)
+                if r.returncode == 0 and os.path.exists(tmp):
+                    os.replace(tmp, final)
+                os.remove(intro_prep)
+
     log(f"Done! → {final}")
     return final
 

@@ -45,13 +45,16 @@ def load_all_songs():
 
 def load_state():
     if os.path.exists("state.json"):
-        with open("state.json") as f:
-            state = json.load(f)
-        # back-compat: add shoutout keys if missing
-        state.setdefault("shoutout_list", [])
-        state.setdefault("shoutout_bench", [])
-        return state
-    return {"list": [], "bench": [], "shoutout_list": [], "shoutout_bench": []}
+        try:
+            with open("state.json") as f:
+                state = json.load(f)
+            state.setdefault("shoutout_list", [])
+            state.setdefault("shoutout_bench", [])
+            state.setdefault("intro_shoutout", None)
+            return state
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {"list": [], "bench": [], "shoutout_list": [], "shoutout_bench": [], "intro_shoutout": None}
 
 
 def save_state(state):
@@ -108,15 +111,21 @@ def index():
     sh_bench = [meta_map[f] for f in state["shoutout_bench"] if f in meta_map]
 
     known_sh = set(state["shoutout_list"] + state["shoutout_bench"])
+    intro_filename = state.get("intro_shoutout")
+    if intro_filename:
+        known_sh.add(intro_filename)
     for s in meta:
         if s["filename"] not in known_sh:
             sh_bench.append(s)
+
+    intro_shoutout = meta_map.get(intro_filename) if intro_filename else None
 
     return render_template("index.html",
         list_songs=list_songs,
         bench_songs=bench_songs,
         shoutout_list=sh_list,
         shoutout_bench=sh_bench,
+        intro_shoutout=intro_shoutout,
     )
 
 
@@ -124,10 +133,11 @@ def index():
 def save():
     data = request.json or {}
     save_state({
-        "list":          data.get("list", []),
-        "bench":         data.get("bench", []),
-        "shoutout_list": data.get("shoutout_list", []),
+        "list":           data.get("list", []),
+        "bench":          data.get("bench", []),
+        "shoutout_list":  data.get("shoutout_list", []),
         "shoutout_bench": data.get("shoutout_bench", []),
+        "intro_shoutout": data.get("intro_shoutout", None),
     })
 
     start_times = data.get("start_times", {})
@@ -379,6 +389,7 @@ def build():
 
     meta_map = {s["filename"]: s for s in load_shoutout_meta()}
     shoutout_list = [meta_map[f] for f in state["shoutout_list"] if f in meta_map]
+    intro_shoutout = meta_map.get(state.get("intro_shoutout"))
 
     job_id = uuid.uuid4().hex[:8]
     q: queue.Queue = queue.Queue()
@@ -399,6 +410,7 @@ def build():
             result = make_club_from_app(
                 song_list=song_list,
                 shoutout_list=shoutout_list,
+                intro_shoutout=intro_shoutout,
                 build_dir="output",
                 log=lambda msg: q.put({"type": "log", "msg": msg}),
                 **opts,
