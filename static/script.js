@@ -99,8 +99,7 @@ function updateCounts() {
 // ── WAVEFORM / PLAY ───────────────────────────────────────────────────────────
 
 function formatTime(s) {
-    const m = Math.floor(s / 60);
-    return `${m}:${Math.floor(s % 60).toString().padStart(2, "0")}`;
+    return Math.floor(s) + "s";
 }
 
 function togglePlay(button) {
