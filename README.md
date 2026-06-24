@@ -1,105 +1,127 @@
-Er du også træt af at høre den samme klub 100 igen og igen hver fredag inden du tager i kb? Er din KABS også latterligt langsom til at klistre lydklip sammen i Audacity?
+# Klub 100 Maker
 
-Alle disse problemer og mange flere er nu fortid - saml jeres yndlings YouTube/SoundCloud links i en .csv fil (Google Sheet -> export to csv), og producér en studio quality klub 100 på ~10 minutter.
+Træt af at sidde i Audacity og klistre lydklip sammen manuelt? Saml jeres yndlings YouTube/SoundCloud links og producér en studio-quality Klub 100 på ~10 minutter via en web-brugerflade.
 
-Brugt til at samle  ./shoutouts/ og klub.csv brugt til denne klub 2^7 medfølger i dette repo.
+## Krav
 
-Eksempler på brug af denne kan ses i mappen Examples, hvor csv og shoutouts kan findes:
-* Klub 2^7 18': https://soundcloud.com/kenny-olsen/smkid-klub-2-7 af S/M+KID studiestarten '18.
-* Klub 2^7 19': https://soundcloud.com/luke-leindance/smkid-klub27-2019 af S/M+KID studiestarten '19.
-* KLub 4^4: https://soundcloud.com/luke-leindance/klub-44 af S/M+KID studiestarten '19.
+- Python 3.14+
+- [uv](https://docs.astral.sh/uv/) (pakkehåndtering)
+- [ffmpeg](https://ffmpeg.org/download.html) — installér separat:
+  - macOS: `brew install ffmpeg`
+  - Windows: `winget install ffmpeg` (eller `choco install ffmpeg` med Chocolatey)
+  - Linux: `sudo apt install ffmpeg`
 
-OBS. de to Klub 2^7 samt 4^4 er lavet med en anden mappe struktur og vil derfor kræve en anden strukturering, se evt. https://github.com/falkaer/klub-100-maker.
-
-<!-- # Hvordan, hvor og hvorfor gør jeg ting?
-
-Før du kører noget som helst, bør indholdet af denne mappe have følgende struktur:
-
-```
-klub-100-maker/
-├── shoutouts/
-│   ├── 1.wav
-│   ├── 2.wav
-│   ├── ...
-│   └── n.wav
-├── klub.csv
-├── dl.py
-├── prepare_shoutout.py
-├── prepare_track.py
-├── prepare_all_shoutouts.py
-├── prepare_all_tracks.py
-└── combine.py
-```
-
-hvor ./shoutouts/n.wav indeholder skud ud'et til den n'te sang i klub 100en, hvis det giver mening. Skud ud'et kommer *før* sangen, så ./shoutouts/1.wav er jeres intro-skud-ud.
-
-## klub.csv
-
-Denne .csv fil indeholder information om sangene i en klub 100. Hver række svarer til en sang og et skud ud, hvor første kolonne er sangens navn, anden kolonne er et YouTube/SoundCloud link, og tredje kolonne er det timestamp (i sekunder) i sangen, hvor jeres ene minut af sangen skal begynde. -->
-
-# Forarbejde
-For at kunne lave en klub 100, skal der udfyldes et sheet med hvilke sange man ønsker, samt evt hvilke shoutouts man vil have.
-
-Opbygningen af klub 100 foregår vha. sheet_templaten.
-
-Det er vigtigt at kolonner har de samme navne, som angivet nedenunder.
-
-## Sange
-Arket “Sange” indeholder de sange som Klub 100 skal bestå af. 
-
-I feltet ”Sang - Kunstner” skal en title samt kunster angives i formatter “sang - kunstner”. 
-
-I feltet “link” angives et link til den ønskede sang, her skal angives et link (sider der understøttet ses her: https://github.com/ytdl-org/youtube-dl/blob/master/docs/supportedsites.md).
-
-I feltet “starttidspunkt (i sek)” angives det antal sekunder inde i klippet at sangen skal startes, der vil herfra blive klippet 60 sekunder ud, som anvendes i Børne Klub 100.
-
-Ønsker man at en sang skal have et bestemt shoutout inden sangen afspilles, skrives shoutsoutets titel i feltet “Shoutout”. Det er nemmest at kalde dine shoutouts tallene 1-100 i den rækkefølge de skal afspilles.
-
-Det er muligt selv at tilføje flere kolonner med ting, som fx en kommentar. Disse vil blive ignoreret i bygningen af klub 100.
-
-## Shoutouts (kun nødvendigt ved "links" som shoutout_type)
-Arket “Shoutouts” indeholder de citater, som placeres mellem sangene.
-
-I feltet “Shoutout titel” gives en titel som indikere hvad der siges/er essencen af shoutoutet. Dette vil blive shoutoutets reference og lydoptagelsen skal have dette navn for at blive matchet med den rette sang. Denne kolonne er den eneste nødvendige, hvis man selv indspiller shoutouts.
-
-I feltet “link” angives et link til det ønskede citat. Dette bruges, hvis man ikke selv indspiller citater, men derimod henter dem fra et understøttet site (https://github.com/ytdl-org/youtube-dl/blob/master/docs/supportedsites.md).
-
-I felterne “start tid (sek)” og “slut tid (sek)” angives start og sluttidspunktet i sekunder for det citat man ønsker. Disse tidspunkter referere til lyden i det angivne link.
-
-I feltet “downloadet” angives med et “x” om det er et citat der skal downloades, da det ikke er fra et understøttet site (https://github.com/ytdl-org/youtube-dl/blob/master/docs/supportedsites.md).
-
-
-# Kræver:
- * `python3`
- * `youtube-dl` - for at køre dl.py
- * `ffmpeg` - for at køre prepare_track.py, prepare_shoutout.py og combine.py, skal muligvis installeres fra https://ffmpeg.org/download.html
-
-
-# Hvordan kører jeg det her?
-
-For at kører scriptet skal du ligge inde i denne mappe og have kørt disse følgende kommandoer:
+## Opsætning
 
 ```bash
-make venv #skaber et nyt virtuelt envionrment kaldet .venv
-source .venv/bin/activate #aktiverer det virtuelle environment
-make install #installerer alle dependencies
-```
-Nu skal du bare kører scriptet med følgende kommando for at lave en klub 100:
-```bash
-python3 make_klub.py -c mappe_lokation -d navn_på_csvfilen.csv -s shoutout_type
+git clone <repo-url> && cd club100
+just install        # eller: uv sync
 ```
 
-du kan specifere forskellige ting med følgende argumenter:
+Start herefter webappen:
 
 ```bash
-'-c', '--club_folder', default='Examples/Bums100', Det er lokationen af klub.csv og shoutouts
-'-d', '--club_file', default='Nums100.xlsx', Det er navnet på klub.csv
-'-o', '--output_name', default="Love100", Det er navnet på den output fil der bliver lavet
-'-f', '--file_format', default="mp3", Det er filformatet på den output fil der bliver lavet
-'-s', '--shoutout_type', default="none", Typen af shoutsouts der skal bruges. Kan være "none", "own" eller "links"
+just run            # eller: uv run python app.py
 ```
 
-# Cookies og youtube-dl
-Hvis du får fejl ved at downloade fra youtube, kan det være fordi du mangler en cookie. Dette kan løses ved at downloade en extenstion som kan få dine cookies lokalt, det kan f.eks. være ved hjælp af [Get cookies.txt LOCALLY](https://chrome.google.com/webstore/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc) (for Chrome) eller [cookies.txt](https://addons.mozilla.org/en-GB/firefox/addon/cookies-txt/?utm_source=addons.mozilla.org&utm_medium=referral&utm_content=search) (for Firefox).
+Åbn `http://localhost:5000` i browseren.
 
-Når du så har downloadet dine cookies fra youtube skal du erstatte den nuværende cookies.txt fil med den du har downloadet. 
+---
+
+## Brug af frontenden
+
+Frontenden består af fire paneler:
+
+| Panel | Beskrivelse |
+|---|---|
+| **BENCH** | Sange der er tilføjet men ikke er i Top 100 endnu |
+| **TOP 100** | Den endelige liste — rækkefølgen bestemmer Klub 100 |
+| **SHOUTOUTS** | Shoutouts i den rækkefølge de afspilles (én per sang) |
+| **SHOUT BENCH** | Shoutouts der er indspillet/importeret men ikke placeret endnu |
+
+### Tilføj sange
+
+Klik **+ New Song** og indsæt ét eller flere YouTube/SoundCloud-links (ét pr. linje). Sange der allerede er tilføjet springes over. Nye sange lander i **BENCH**.
+
+### Byg Top 100
+
+Træk sange fra **BENCH** til **TOP 100** (drag & drop). Rækkefølgen i **TOP 100** er den endelige afspilningsrækkefølge. Nummeret (#1, #2, …) vises automatisk.
+
+### Indstil starttidspunkt
+
+Hvert sangkort har et **s**-felt (sekunder). Angiv det tidspunkt i sangen, hvorfra de 60 sekunder skal klippes. Klik på **▶** på kortet for at afspille og se bølgeformen — klik direkte i bølgeformen for at justere starttidspunktet visuelt.
+
+### Slet en sang
+
+Klik **✕** på sangkortet. Sangen og dens downloadede fil slettes permanent.
+
+### Shoutouts
+
+Shoutouts placeres automatisk før den sang der har samme position. Træk dem fra **SHOUT BENCH** til **SHOUTOUTS** og sorter dem i den ønskede rækkefølge.
+
+**Indspil shoutout:** Klik **● Record** i SHOUT BENCH-panelet. Optag, stop, navngiv og gem — optagelsen konverteres automatisk til WAV.
+
+**Trim shoutout:** Klik **✂** på et shoutout-kort for at åbne trim-modalen. Justér start/slut med sliderne, preview med **▶ Preview**, og gem med **Trim & Save**.
+
+**Importér eksisterende filer:** Læg `.wav`-filer direkte i mappen `shoutouts/` — de dukker op automatisk i SHOUT BENCH ved næste reload.
+
+### Energy Curve
+
+Klik **⚡ Energy** for at se en graf over energiniveauet for sangene i Top 100. Klik **Analyze** for at beregne energy-scores (kræver at sangene er downloadet). Brug grafen til at tjekke at Klub 100 har en god kurve.
+
+### Preview
+
+Klik **▷ Preview** for at høre overgangene mellem sangene (slutningen af en sang → shoutout → starten af næste sang). Brug **⏮ / ⏭** til at navigere mellem overgange.
+
+### Gem
+
+Klik **Save** (eller vent — ændringer i rækkefølgen og starttidspunkter gemmes automatisk til `state.json`).
+
+### Byg Klub 100
+
+Klik **⬇ Make Klub** og konfigurér:
+
+| Felt | Standard | Beskrivelse |
+|---|---|---|
+| Output name | `klub100` | Filnavn på output |
+| Format | `mp3` | `mp3` eller `wav` |
+| Song volume (LUFS) | `-14` | Normaliseret lydstyrke for sange |
+| Shoutout volume (LUFS) | `-14` | Normaliseret lydstyrke for shoutouts |
+| Fade (sekunder) | `3` | Crossfade-varighed mellem segmenter |
+| Song length (sekunder) | `60` | Hvor mange sekunder der klippes fra hver sang |
+
+Klik **Start** — et log-vindue viser fremgangen. Når bygningen er færdig, vises et **⬇ Download**-link.
+
+---
+
+## SoundCloud cookies (valgfrit)
+
+Hvis downloads fra SoundCloud fejler, skal du eksportere dine browser-cookies:
+
+```bash
+just sc-cookies          # bruger Chrome som standard
+just sc-cookies firefox  # eller Firefox
+```
+
+Kommandoen gemmer cookies til `sc_cookies.txt` automatisk.
+
+For YouTube-cookies: brug en extension som [Get cookies.txt LOCALLY](https://chrome.google.com/webstore/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc) og erstat `cookies.txt` med den downloadede fil.
+
+---
+
+## Mappestruktur
+
+```
+club100/
+├── app.py              # Flask-backend
+├── make_klub.py        # Byggelogik
+├── Functions/          # Hjælpefunktioner (download, prepare, energy, …)
+├── templates/          # HTML-frontend (index.html)
+├── static/             # CSS og JS
+├── song_info/          # Metadata per sang (JSON)
+├── tracks/             # Downloadede WAV-filer
+├── shoutouts/          # Shoutout-lydfiler
+├── output/             # Færdige Klub 100-filer
+├── state.json          # Aktuel liste- og bench-tilstand
+└── shoutout_meta.json  # Shoutout-metadata og rækkefølge
+```
