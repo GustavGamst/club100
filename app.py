@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, jsonify, send_file, Response
-import os, json, subprocess, datetime, threading, queue, uuid
+import os, json, re, subprocess, datetime, threading, queue, uuid
 import yt_dlp
 from Functions.dl_new import download_song
 
@@ -7,11 +7,18 @@ app = Flask(__name__)
 
 
 def get_track_id(url):
+    if url.startswith("local:"):
+        return url[6:]
     if "soundcloud" in url:
         return url.rstrip("/").split("/")[-1].split("?")[0]
     if "v=" in url:
         return url.split("v=")[-1].split("&")[0]
     return url.rstrip("/").split("/")[-1].split("?")[0]
+
+
+def _sanitize_id(name):
+    base = re.sub(r'[^a-z0-9_\-]', '_', name.lower()).strip('_')
+    return base[:40] or uuid.uuid4().hex[:8]
 
 
 def load_all_songs():
@@ -514,6 +521,87 @@ def energy_stream(job_id):
 
     return Response(generate(), mimetype="text/event-stream",
                     headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})
+
+
+@app.post("/upload_song")
+def upload_song():
+    if "file" not in request.files:
+        return jsonify({"status": "error", "message": "No file provided"}), 400
+    f = request.files["file"]
+    if not f.filename:
+        return jsonify({"status": "error", "message": "Empty filename"}), 400
+
+    base, ext = os.path.splitext(os.path.basename(f.filename))
+    tid = _sanitize_id(base)
+    if os.path.exists(f"song_info/info_{tid}.json") or os.path.exists(f"tracks/{tid}.wav"):
+        tid = f"{tid}_{uuid.uuid4().hex[:6]}"
+
+    os.makedirs("tracks", exist_ok=True)
+    raw_path = os.path.join("tracks", f"{tid}{ext}")
+    wav_path = os.path.join("tracks", f"{tid}.wav")
+    f.save(raw_path)
+
+    if ext.lower() != ".wav":
+        result = subprocess.run(["ffmpeg", "-y", "-i", raw_path, wav_path], capture_output=True)
+        if result.returncode == 0 and os.path.exists(wav_path):
+            os.remove(raw_path)
+        else:
+            os.rename(raw_path, wav_path)
+    else:
+        os.rename(raw_path, wav_path)
+
+    url = f"local:{tid}"
+    song = {"title": base, "thumbnail": "", "url": url, "start_time": 0, "track_id": tid}
+    os.makedirs("song_info", exist_ok=True)
+    with open(f"song_info/info_{tid}.json", "w") as fp:
+        json.dump(song, fp)
+
+    state = load_state()
+    if url not in state["list"] and url not in state["bench"]:
+        state["bench"].append(url)
+        save_state(state)
+
+    return jsonify({"status": "ok", "song": song})
+
+
+@app.post("/upload_shoutout")
+def upload_shoutout():
+    if "file" not in request.files:
+        return jsonify({"status": "error", "message": "No file provided"}), 400
+    f = request.files["file"]
+    if not f.filename:
+        return jsonify({"status": "error", "message": "Empty filename"}), 400
+
+    orig_name = os.path.basename(f.filename)
+    base, ext = os.path.splitext(orig_name)
+    os.makedirs("shoutouts", exist_ok=True)
+    raw_path = os.path.join("shoutouts", orig_name)
+    wav_filename = base + ".wav"
+    wav_path = os.path.join("shoutouts", wav_filename)
+    f.save(raw_path)
+
+    if ext.lower() != ".wav":
+        result = subprocess.run(["ffmpeg", "-y", "-i", raw_path, wav_path], capture_output=True)
+        if result.returncode == 0 and os.path.exists(wav_path):
+            os.remove(raw_path)
+            final_filename = wav_filename
+        else:
+            final_filename = orig_name
+    else:
+        final_filename = orig_name
+
+    label = os.path.splitext(final_filename)[0]
+    meta = load_shoutout_meta()
+    if not any(s["filename"] == final_filename for s in meta):
+        meta.append({"filename": final_filename, "label": label})
+        save_shoutout_meta(meta)
+
+    state = load_state()
+    if final_filename not in state["shoutout_list"] and final_filename not in state["shoutout_bench"]:
+        state["shoutout_bench"].append(final_filename)
+        save_state(state)
+
+    return jsonify({"status": "ok", "filename": final_filename, "label": label})
 
 
 @app.get("/download/<filename>")

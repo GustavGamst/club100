@@ -373,6 +373,56 @@ function escHtml(str) {
         .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+// ── LOCAL FILE UPLOAD ─────────────────────────────────────────────────────────
+
+async function handleLocalSongUpload(input) {
+    const files = Array.from(input.files);
+    if (!files.length) return;
+
+    const progress = document.getElementById("new-song-progress");
+    progress.style.display = "block";
+    let added = 0, failed = 0;
+
+    for (let i = 0; i < files.length; i++) {
+        progress.textContent = `Uploading ${i + 1} / ${files.length}: ${files[i].name}…`;
+        const fd = new FormData();
+        fd.append("file", files[i]);
+        try {
+            const r = await fetch("/upload_song", { method: "POST", body: fd });
+            const data = await r.json();
+            if (data.status === "ok") { appendSongCard(data.song); added++; }
+            else { failed++; progress.textContent = `Error: ${data.message}`; }
+        } catch { failed++; }
+    }
+
+    input.value = "";
+    updateCounts();
+    markDirty();
+    const parts = [`Uploaded ${added}`];
+    if (failed > 0) parts.push(`${failed} failed`);
+    progress.textContent = parts.join(" · ");
+    document.getElementById("new-song-close-btn").textContent = "Close";
+}
+
+async function handleShoutoutUpload(input) {
+    const files = Array.from(input.files);
+    if (!files.length) return;
+
+    for (const file of files) {
+        const fd = new FormData();
+        fd.append("file", file);
+        try {
+            const r = await fetch("/upload_shoutout", { method: "POST", body: fd });
+            const data = await r.json();
+            if (data.status === "ok") appendShoutoutCard(data.filename, data.label);
+        } catch { /* silent */ }
+    }
+
+    input.value = "";
+    updateCounts();
+    markDirty();
+}
+
 // ── DELETE SONG ───────────────────────────────────────────────────────────────
 
 function deleteSong(button) {

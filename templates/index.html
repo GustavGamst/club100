@@ -111,7 +111,11 @@
         <div class="panel-header">
             <span class="panel-title">SHOUT BENCH</span>
             <span class="count-badge" id="shout-bench-count">{{ shoutout_bench|length }}</span>
-            <button class="btn-record" id="record-btn" onclick="toggleRecord()">● Record</button>
+            <div class="panel-header-btns">
+                <label class="btn-upload-shout" for="shoutout-file-input">⬆ Upload</label>
+                <input type="file" id="shoutout-file-input" accept="audio/*" multiple style="display:none" onchange="handleShoutoutUpload(this)">
+                <button class="btn-record" id="record-btn" onclick="toggleRecord()">● Record</button>
+            </div>
         </div>
 
         <div id="record-ui" class="record-ui" style="display:none">
@@ -189,8 +193,11 @@
         </div>
         <div class="modal-body">
             <p class="modal-hint">Paste one or more YouTube / SoundCloud URLs, one per line. Already-added songs are skipped.</p>
-            <textarea id="new-song-urls" class="url-textarea" rows="8" placeholder="https://www.youtube.com/watch?v=…&#10;https://soundcloud.com/…"></textarea>
+            <textarea id="new-song-urls" class="url-textarea" rows="6" placeholder="https://www.youtube.com/watch?v=…&#10;https://soundcloud.com/…"></textarea>
             <div id="new-song-progress" class="new-song-progress" style="display:none"></div>
+            <div class="upload-divider">— or upload local files —</div>
+            <label class="btn btn-outline upload-file-label" for="local-song-input">⬆ Choose audio files…</label>
+            <input type="file" id="local-song-input" accept="audio/*" multiple style="display:none" onchange="handleLocalSongUpload(this)">
         </div>
         <div class="modal-footer">
             <button class="btn btn-outline" id="new-song-submit-btn" onclick="submitBulkSongs()">Add Songs</button>
