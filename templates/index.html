@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Klub 100</title>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script src="https://unpkg.com/wavesurfer.js@7"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header>
+    <span class="logo">KLUB 100</span>
+    <div class="header-actions">
+        <button class="btn btn-outline" id="new-song-btn" onclick="addNewSong()">+ New Song</button>
+        <button class="btn btn-energy" onclick="openEnergy()">⚡ Energy</button>
+        <button class="btn btn-preview" id="preview-btn" onclick="startPreview()">▷ Preview</button>
+        <button class="btn btn-build" onclick="openBuild()">⬇ Make Klub</button>
+        <button class="btn btn-save" id="save-btn" onclick="saveOrder()">Save</button>
+        <span id="save-status"></span>
+    </div>
+</header>
+
+{# ── Reusable macros ────────────────────────────────────────────────────── #}
+
+{% macro song_card(song, position=0) %}
+<li class="song-card" data-url="{{ song.url }}" data-track-id="{{ song.track_id }}">
+    <div class="card-main">
+        <span class="position-num">{% if position > 0 %}#{{ position }}{% endif %}</span>
+        <span class="drag-handle" title="Drag to reorder">⠿</span>
+        {% if song.thumbnail %}
+        <img class="thumb" src="{{ song.thumbnail }}" alt="" loading="lazy">
+        {% else %}
+        <div class="thumb thumb-empty">♪</div>
+        {% endif %}
+        <span class="song-title" title="{{ song.title }}">{{ song.title }}</span>
+        <div class="controls">
+            <label class="start-wrap" title="Start time in seconds">
+                <input type="number" class="start-time" value="{{ (song.start_time or 0)|int }}" min="0" onchange="markDirty()">
+                <span class="unit">s</span>
+            </label>
+            <button class="btn-icon play-btn" onclick="togglePlay(this)">▶</button>
+                <button class="btn-icon btn-danger delete-song-btn" onclick="deleteSong(this)" title="Remove song">✕</button>
+        </div>
+    </div>
+    <div class="wave-row" style="display:none">
+        <div class="waveform" id="wave-{{ song.track_id }}"></div>
+        <span class="timer">0:00 / 0:00</span>
+    </div>
+</li>
+{% endmacro %}
+
+{% macro shoutout_card(sh, position=0) %}
+<li class="shoutout-card" data-filename="{{ sh.filename }}">
+    <span class="position-num shout-pos">{% if position > 0 %}#{{ position }}{% endif %}</span>
+    <span class="drag-handle">⠿</span>
+    <span class="shoutout-label">{{ sh.label }}</span>
+    <div class="controls">
+        <button class="btn-icon play-btn" onclick="playShoutout(this)">▶</button>
+        <button class="btn-icon trim-btn" onclick="openTrimModal(this)" title="Trim">✂</button>
+        <button class="btn-icon btn-danger" onclick="deleteShoutout(this)" title="Delete">✕</button>
+    </div>
+</li>
+{% endmacro %}
+
+<main class="layout">
+
+    {# ── SONG BENCH ─────────────────────────────────────────────────────── #}
+    <section class="panel">
+        <div class="panel-header">
+            <span class="panel-title">BENCH</span>
+            <span class="count-badge" id="bench-count">{{ bench_songs|length }}</span>
+        </div>
+        <ul id="bench-section" class="song-list">
+            {% for song in bench_songs %}
+            {{ song_card(song) }}
+            {% endfor %}
+        </ul>
+    </section>
+
+    {# ── TOP 100 LIST ───────────────────────────────────────────────────── #}
+    <section class="panel">
+        <div class="panel-header">
+            <span class="panel-title">TOP 100</span>
+            <span class="count-badge" id="list-count">{{ list_songs|length }}/100</span>
+        </div>
+        <ul id="list-section" class="song-list">
+            {% for song in list_songs %}
+            {{ song_card(song, position=loop.index) }}
+            {% endfor %}
+        </ul>
+    </section>
+
+    {# ── SHOUTOUTS LIST ─────────────────────────────────────────────────── #}
+    <section class="panel">
+        <div class="panel-header">
+            <span class="panel-title">SHOUTOUTS</span>
+            <span class="count-badge" id="shout-list-count">{{ shoutout_list|length }}</span>
+        </div>
+        <ul id="shoutout-list" class="song-list">
+            {% for sh in shoutout_list %}
+            {{ shoutout_card(sh, position=loop.index) }}
+            {% endfor %}
+        </ul>
+    </section>
+
+    {# ── SHOUTOUT BENCH ─────────────────────────────────────────────────── #}
+    <section class="panel">
+        <div class="panel-header">
+            <span class="panel-title">SHOUT BENCH</span>
+            <span class="count-badge" id="shout-bench-count">{{ shoutout_bench|length }}</span>
+            <button class="btn-record" id="record-btn" onclick="toggleRecord()">● Record</button>
+        </div>
+
+        <div id="record-ui" class="record-ui" style="display:none">
+            <div class="record-top-row">
+                <div>
+                    <div class="record-status" id="record-status">Ready</div>
+                    <div class="record-timer" id="record-timer">0:00</div>
+                </div>
+                <div class="meter-wrap">
+                    <div class="meter-track"><div class="meter-fill" id="meter-fill"></div></div>
+                    <span class="meter-label">MIC</span>
+                </div>
+            </div>
+            <button class="btn-icon stop-btn" id="stop-btn" onclick="stopAndPrepSave()" style="display:none">■ Stop</button>
+            <div id="save-row" style="display:none">
+                <input type="text" id="record-name" class="record-name-input" placeholder="Name this shoutout…">
+                <div class="record-btns">
+                    <button class="btn-icon play-btn" onclick="confirmSave()">Save</button>
+                    <button class="btn-icon" onclick="discardRecording()">Discard</button>
+                </div>
+            </div>
+        </div>
+
+        <ul id="shoutout-bench" class="song-list">
+            {% for sh in shoutout_bench %}
+            {{ shoutout_card(sh) }}
+            {% endfor %}
+        </ul>
+    </section>
+
+</main>
+
+<div id="trim-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeTrimModal()">
+    <div class="modal modal-wide">
+        <div class="modal-header">
+            <span class="modal-title" id="trim-modal-title">TRIM SHOUTOUT</span>
+            <button class="btn-icon" onclick="closeTrimModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="trim-wave-wrap">
+                <div id="trim-waveform"></div>
+                <div id="trim-region" class="trim-region"></div>
+            </div>
+            <div class="trim-slider-group">
+                <div class="trim-slider-row">
+                    <label class="trim-label">Start</label>
+                    <input type="range" id="trim-start" class="trim-slider" min="0" max="100" value="0" step="0.01" oninput="onTrimStartChange()">
+                    <span class="trim-val" id="trim-start-val">0.00s</span>
+                </div>
+                <div class="trim-slider-row">
+                    <label class="trim-label">End</label>
+                    <input type="range" id="trim-end" class="trim-slider" min="0" max="100" value="100" step="0.01" oninput="onTrimEndChange()">
+                    <span class="trim-val" id="trim-end-val">—</span>
+                </div>
+                <div class="trim-info-row">
+                    <span class="trim-label">Length</span>
+                    <span class="trim-val" id="trim-duration-val">—</span>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" id="trim-preview-btn" onclick="previewTrim()">▶ Preview</button>
+            <button class="btn btn-outline" onclick="stopTrimPreview()">■ Stop</button>
+            <button class="btn btn-outline" id="trim-save-btn" onclick="saveTrim()">Trim & Save</button>
+            <button class="btn btn-outline" onclick="closeTrimModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<div id="new-song-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeNewSongModal()">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="modal-title">ADD SONGS</span>
+            <button class="btn-icon" onclick="closeNewSongModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <p class="modal-hint">Paste one or more YouTube / SoundCloud URLs, one per line. Already-added songs are skipped.</p>
+            <textarea id="new-song-urls" class="url-textarea" rows="8" placeholder="https://www.youtube.com/watch?v=…&#10;https://soundcloud.com/…"></textarea>
+            <div id="new-song-progress" class="new-song-progress" style="display:none"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" id="new-song-submit-btn" onclick="submitBulkSongs()">Add Songs</button>
+            <button class="btn btn-outline" id="new-song-close-btn" onclick="closeNewSongModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<div id="energy-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeEnergy()">
+    <div class="modal modal-wide">
+        <div class="modal-header">
+            <span class="modal-title">ENERGY CURVE</span>
+            <button class="btn-icon" onclick="closeEnergy()">✕</button>
+        </div>
+        <div class="modal-body">
+            <p id="energy-status" class="energy-status"></p>
+            <div class="chart-wrap">
+                <canvas id="energy-chart"></canvas>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-energy" id="energy-analyze-btn" style="display:none" onclick="startEnergyAnalysis(false)">Analyze</button>
+            <button class="btn btn-outline" id="energy-reanalyze-btn" onclick="startEnergyAnalysis(true)">Re-analyze all</button>
+            <button class="btn btn-outline" onclick="closeEnergy()">Close</button>
+        </div>
+    </div>
+</div>
+
+<div id="build-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeBuild()">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="modal-title">Make Klub 100</span>
+            <button class="btn-icon" onclick="closeBuild()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="build-form">
+                <label class="field">
+                    <span>Output name</span>
+                    <input type="text" id="b-name" value="klub100">
+                </label>
+                <label class="field">
+                    <span>Format</span>
+                    <select id="b-format">
+                        <option value="mp3">MP3</option>
+                        <option value="wav">WAV</option>
+                    </select>
+                </label>
+                <label class="field">
+                    <span>Song volume (LUFS)</span>
+                    <input type="number" id="b-svol" value="-14" min="-70" max="-5">
+                </label>
+                <label class="field">
+                    <span>Shoutout volume (LUFS)</span>
+                    <input type="number" id="b-sovol" value="-14" min="-70" max="-5">
+                </label>
+                <label class="field">
+                    <span>Fade (seconds)</span>
+                    <input type="number" id="b-fade" value="3" min="0" max="10">
+                </label>
+                <label class="field">
+                    <span>Song length (seconds)</span>
+                    <input type="number" id="b-len" value="60" min="10" max="300">
+                </label>
+            </div>
+            <div id="build-log" class="build-log" style="display:none"></div>
+            <a id="build-download" class="btn btn-build" style="display:none" download>⬇ Download</a>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-build" id="build-start-btn" onclick="startBuild()">Start</button>
+            <button class="btn btn-outline" onclick="closeBuild()">Close</button>
+        </div>
+    </div>
+</div>
+
+<div id="preview-bar" class="preview-bar" style="display:none">
+    <div class="pv-controls">
+        <button class="btn-icon stop-btn" onclick="stopPreview()" title="Stop preview">■</button>
+        <button class="btn-icon" id="pv-prev" onclick="prevTransition()" title="Previous">⏮</button>
+        <button class="btn-icon" id="pv-next" onclick="nextTransition()" title="Next">⏭</button>
+        <span id="pv-pos" class="pv-pos">1/1</span>
+    </div>
+    <div class="pv-flow">
+        <span class="pv-seg" id="pv-seg-end"></span>
+        <span class="pv-arrow">→</span>
+        <span class="pv-seg pv-shout" id="pv-seg-shout"></span>
+        <span class="pv-arrow">→</span>
+        <span class="pv-seg" id="pv-seg-next"></span>
+    </div>
+    <div class="pv-right">
+        <span id="pv-phase" class="pv-phase"></span>
+        <div class="pv-track"><div id="pv-fill" class="pv-fill"></div></div>
+    </div>
+</div>
+
+<script src="/static/script.js"></script>
+</body>
+</html>
