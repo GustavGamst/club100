@@ -196,19 +196,12 @@ header {
 /* Delete button only visible on bench cards */
 #list-section .delete-song-btn { display: none; }
 
-.drag-handle {
-    flex-shrink: 0;
-    cursor: grab;
-    color: var(--muted);
-    font-size: 14px;
-    padding: 0 1px;
-    user-select: none;
-    opacity: 0.4;
-    transition: opacity 0.12s;
-}
-.song-card:hover .drag-handle,
-.shoutout-card:hover .drag-handle { opacity: 1; }
-.drag-handle:active { cursor: grabbing; }
+.drag-handle { display: none; }
+
+.song-card, .shoutout-card { cursor: grab; }
+.song-card.sortable-chosen, .shoutout-card.sortable-chosen { cursor: grabbing; }
+.song-card button, .song-card input, .song-card label,
+.shoutout-card button { cursor: pointer; }
 
 .thumb {
     width: 54px;

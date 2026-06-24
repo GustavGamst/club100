@@ -14,10 +14,14 @@ let audioCtx = null;
 
 // ── SORTABLE ──────────────────────────────────────────────────────────────────
 
+const SONG_DRAG_FILTER  = "button, input, label, .waveform";
+const SHOUT_DRAG_FILTER = "button, input, .shoutout-label";
+
 Sortable.create(document.getElementById("bench-section"), {
     group: { name: "songs", pull: true, put: true },
     animation: 180,
-    handle: ".drag-handle",
+    filter: SONG_DRAG_FILTER,
+    preventOnFilter: false,
     ghostClass: "sortable-ghost",
     chosenClass: "sortable-chosen",
     onEnd() { updateListNumbers(); markDirty(); },
@@ -26,7 +30,8 @@ Sortable.create(document.getElementById("bench-section"), {
 Sortable.create(document.getElementById("list-section"), {
     group: { name: "songs", pull: true, put: true },
     animation: 180,
-    handle: ".drag-handle",
+    filter: SONG_DRAG_FILTER,
+    preventOnFilter: false,
     ghostClass: "sortable-ghost",
     chosenClass: "sortable-chosen",
     onEnd() { updateListNumbers(); markDirty(); },
@@ -35,7 +40,8 @@ Sortable.create(document.getElementById("list-section"), {
 Sortable.create(document.getElementById("shoutout-list"), {
     group: { name: "shouts", pull: true, put: true },
     animation: 180,
-    handle: ".drag-handle",
+    filter: SHOUT_DRAG_FILTER,
+    preventOnFilter: false,
     ghostClass: "sortable-ghost",
     chosenClass: "sortable-chosen",
     onEnd() { updateShoutListNumbers(); markDirty(); },
@@ -44,7 +50,8 @@ Sortable.create(document.getElementById("shoutout-list"), {
 Sortable.create(document.getElementById("shoutout-bench"), {
     group: { name: "shouts", pull: true, put: true },
     animation: 180,
-    handle: ".drag-handle",
+    filter: SHOUT_DRAG_FILTER,
+    preventOnFilter: false,
     ghostClass: "sortable-ghost",
     chosenClass: "sortable-chosen",
     onEnd() { updateShoutListNumbers(); markDirty(); },
