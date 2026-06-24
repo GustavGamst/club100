@@ -15,7 +15,7 @@ let audioCtx = null;
 // ── SORTABLE ──────────────────────────────────────────────────────────────────
 
 const SONG_DRAG_FILTER  = "button, input, label, .waveform";
-const SHOUT_DRAG_FILTER = "button, input, .shoutout-label";
+const SHOUT_DRAG_FILTER = "button, input";
 
 Sortable.create(document.getElementById("bench-section"), {
     group: { name: "songs", pull: true, put: true },
