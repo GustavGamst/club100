@@ -374,13 +374,55 @@ header {
 
 .waveform { height: 56px; margin-top: 2px; }
 
+.wave-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 4px;
+    gap: 8px;
+}
+
 .timer {
-    display: block;
     font-size: 10px;
     color: var(--muted);
-    text-align: right;
-    padding-top: 2px;
     font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+}
+
+.eq-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.eq-group {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.eq-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--muted);
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+.eq-slider {
+    width: 72px;
+    accent-color: var(--accent2);
+    cursor: pointer;
+}
+
+.eq-val {
+    font-size: 10px;
+    color: var(--muted);
+    width: 36px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
 }
 
 /* ── SHOUTOUT CARDS ─────────────────────────────────────────────────────────── */

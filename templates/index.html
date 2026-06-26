@@ -47,7 +47,21 @@
     </div>
     <div class="wave-row" style="display:none">
         <div class="waveform" id="wave-{{ song.track_id }}"></div>
-        <span class="timer">0:00 / 0:00</span>
+        <div class="wave-footer">
+            <span class="timer">0:00 / 0:00</span>
+            <div class="eq-row">
+                <div class="eq-group">
+                    <span class="eq-label">VOL</span>
+                    <input type="range" class="eq-slider" data-eq="volume" min="0" max="2" step="0.05" value="1" oninput="onEqChange(this)">
+                    <span class="eq-val">1.0×</span>
+                </div>
+                <div class="eq-group">
+                    <span class="eq-label">BASS</span>
+                    <input type="range" class="eq-slider" data-eq="bass" min="-12" max="12" step="1" value="0" oninput="onEqChange(this)">
+                    <span class="eq-val">0dB</span>
+                </div>
+            </div>
+        </div>
     </div>
 </li>
 {% endmacro %}

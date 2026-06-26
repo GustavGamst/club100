@@ -227,8 +227,8 @@ def make_club_from_app(song_list, shoutout_list, build_dir="output",
             except Exception as e:
                 log(f"  WARNING: Could not download {song['title']}: {e}")
 
-    # ── Symlink songs to numbered files ──────────────────────────────────────
-    log("Linking song files…")
+    # ── Copy songs to numbered files ──────────────────────────────────────────
+    log("Copying song files…")
     csv_rows = []
     for i, song in enumerate(song_list, 1):
         src = os.path.abspath(os.path.join("tracks", f"{song['track_id']}.wav"))
@@ -236,7 +236,7 @@ def make_club_from_app(song_list, shoutout_list, build_dir="output",
         if os.path.islink(dst) or os.path.exists(dst):
             os.remove(dst)
         if os.path.exists(src):
-            os.symlink(src, dst)
+            shutil.copy2(src, dst)
         else:
             log(f"  WARNING: Track missing for #{i} {song['title']}, will be skipped")
         csv_rows.append([song["url"], song["title"], int(song.get("start_time") or 0)])
@@ -244,16 +244,16 @@ def make_club_from_app(song_list, shoutout_list, build_dir="output",
     with open(songs_csv_path, "w", newline="") as f:
         csv_mod.writer(f).writerows(csv_rows)
 
-    # ── Symlink shoutouts to numbered files ──────────────────────────────────
+    # ── Copy shoutouts to numbered files ──────────────────────────────────────
     if with_shoutouts:
-        log(f"Linking {len(shoutout_list)} shoutout files…")
+        log(f"Copying {len(shoutout_list)} shoutout files…")
         for i, shout in enumerate(shoutout_list, 1):
             src = os.path.abspath(os.path.join("shoutouts", shout["filename"]))
             dst = os.path.join(shout_in_dir, f"{i}.wav")
             if os.path.islink(dst) or os.path.exists(dst):
                 os.remove(dst)
             if os.path.exists(src):
-                os.symlink(src, dst)
+                shutil.copy2(src, dst)
             else:
                 log(f"  WARNING: Shoutout missing: {shout['filename']}")
 

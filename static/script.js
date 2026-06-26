@@ -1,6 +1,7 @@
 // ── STATE ─────────────────────────────────────────────────────────────────────
 
 const wavesurfers = {};
+const eqNodes = {};
 let activeWaveId = null;
 let activeShoutoutAudio = null;
 let isDirty = false;
@@ -166,10 +167,48 @@ function togglePlay(button) {
         wavesurfers[waveId].load("/audio?link=" + encodeURIComponent(url));
 
         wavesurfers[waveId].on("ready", () => {
+            const ws = wavesurfers[waveId];
+            try {
+                // Approach A: WaveSurfer uses Web Audio internally — hook into its gainNode
+                const wsGain = ws.gainNode;
+                if (wsGain instanceof GainNode) {
+                    const ac = wsGain.context;
+                    const eqGain = ac.createGain();
+                    eqGain.gain.value = 1.0;
+                    const bass = ac.createBiquadFilter();
+                    bass.type = "lowshelf";
+                    bass.frequency.value = 150;
+                    bass.gain.value = 0;
+                    wsGain.disconnect();
+                    wsGain.connect(eqGain);
+                    eqGain.connect(bass);
+                    bass.connect(ac.destination);
+                    eqNodes[waveId] = { gain: eqGain, bass };
+                } else {
+                    // Approach B: WaveSurfer uses native MediaElement — create our own chain
+                    const mediaEl = ws.getMediaElement?.() || ws.media;
+                    if (mediaEl) {
+                        const ac = new AudioContext();
+                        const src = ac.createMediaElementSource(mediaEl);
+                        const eqGain = ac.createGain();
+                        eqGain.gain.value = 1.0;
+                        const bass = ac.createBiquadFilter();
+                        bass.type = "lowshelf";
+                        bass.frequency.value = 150;
+                        bass.gain.value = 0;
+                        src.connect(eqGain);
+                        eqGain.connect(bass);
+                        bass.connect(ac.destination);
+                        eqNodes[waveId] = { gain: eqGain, bass, ownAc: ac };
+                        ac.resume();
+                    }
+                }
+            } catch(e) { /* EQ unavailable, playback still works */ }
+
             button.disabled = false;
             button.textContent = "⏸";
-            wavesurfers[waveId].setTime(startTime);
-            wavesurfers[waveId].play();
+            ws.setTime(startTime);
+            ws.play();
             activeWaveId = waveId;
         });
 
@@ -187,6 +226,7 @@ function togglePlay(button) {
             button.disabled = false;
             waveRow.style.display = "none";
             delete wavesurfers[waveId];
+            if (eqNodes[waveId]) { eqNodes[waveId].ownAc?.close(); delete eqNodes[waveId]; }
             const title = card.querySelector(".song-title");
             const prev = title.title;
             title.title = "Could not load audio — SoundCloud streaming may be unavailable for this track";
@@ -202,11 +242,27 @@ function togglePlay(button) {
             activeWaveId = null;
         } else {
             waveRow.style.display = "block";
+            if (eqNodes[waveId]?.ownAc) eqNodes[waveId].ownAc.resume();
             ws.setTime(startTime);
             ws.play();
             button.textContent = "⏸";
             activeWaveId = waveId;
         }
+    }
+}
+
+function onEqChange(slider) {
+    const card  = slider.closest(".song-card");
+    const nodes = eqNodes["wave-" + card.dataset.trackId];
+    if (!nodes) return;
+    const value = parseFloat(slider.value);
+    const label = slider.nextElementSibling;
+    if (slider.dataset.eq === "volume") {
+        nodes.gain.gain.value = value;
+        label.textContent = value.toFixed(1) + "×";
+    } else if (slider.dataset.eq === "bass") {
+        nodes.bass.gain.value = value;
+        label.textContent = (value >= 0 ? "+" : "") + value + "dB";
     }
 }
 
@@ -385,7 +441,21 @@ function appendSongCard(song) {
         </div>
         <div class="wave-row" style="display:none">
             <div class="waveform" id="wave-${escHtml(song.track_id)}"></div>
-            <span class="timer">0:00 / 0:00</span>
+            <div class="wave-footer">
+                <span class="timer">0:00 / 0:00</span>
+                <div class="eq-row">
+                    <div class="eq-group">
+                        <span class="eq-label">VOL</span>
+                        <input type="range" class="eq-slider" data-eq="volume" min="0" max="2" step="0.05" value="1" oninput="onEqChange(this)">
+                        <span class="eq-val">1.0×</span>
+                    </div>
+                    <div class="eq-group">
+                        <span class="eq-label">BASS</span>
+                        <input type="range" class="eq-slider" data-eq="bass" min="-12" max="12" step="1" value="0" oninput="onEqChange(this)">
+                        <span class="eq-val">0dB</span>
+                    </div>
+                </div>
+            </div>
         </div>
     `;
     document.getElementById("bench-section").appendChild(li);
@@ -463,6 +533,7 @@ function deleteSong(button) {
         if (data.status === "ok") {
             const waveId = "wave-" + card.dataset.trackId;
             if (wavesurfers[waveId]) { wavesurfers[waveId].destroy(); delete wavesurfers[waveId]; }
+            if (eqNodes[waveId]) { eqNodes[waveId].ownAc?.close(); delete eqNodes[waveId]; }
             card.remove();
             updateCounts();
             markDirty();
